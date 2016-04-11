@@ -104,22 +104,35 @@ func TestStart(t *testing.T) {
 
 		if chrooted {
 			err = task.StartChroot()
+			if err == nil {
+				// This should fail
+				t.Error("Chroot tests must fail")
+				continue
+			} else {
+				// We cannot more here
+				task.Close()
+				continue
+			}
 		} else {
 			err = task.Start()
 		}
 		if err != nil {
-			t.Fatalf("Error starting a task: %v", err)
+			t.Errorf("Error starting a task: %v", err)
+			continue
 		}
 
 		bytes, err := ioutil.ReadAll(stdout)
 		if err != nil {
-			t.Fatalf("Gathering output: %v", err)
+			t.Errorf("Gathering output: %v", err)
+			continue
 		}
 		t.Logf("Result from command: %s", bytes)
 
 		if err = task.Command.Wait(); err != nil {
-			t.Fatalf("Error waiting for the task: %v", err)
+			t.Errorf("Error waiting for the task: %v", err)
+			continue
 		}
+		task.Close()
 	}
 }
 
