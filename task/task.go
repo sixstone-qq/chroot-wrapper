@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"syscall"
 )
 
 const TaskFilePrefix = "task"
@@ -123,20 +124,36 @@ func (t *Task) Retrieve() (err error) {
 }
 
 // Start the command asynchronously
-func (t *Task) Start() (err error) {
+func (t *Task) Start() error {
+	return t.start(false)
+}
+
+func (t *Task) start(chrooted bool) (err error) {
 	if t.image == nil {
 		if err = t.Retrieve(); err != nil {
 			return err
 		}
+	}
+	if len(t.dirimage) == 0 {
 		// Extract the content in dirimage
 		if t.dirimage, err = ioutil.TempDir("", TaskFilePrefix); err != nil {
 			return err
 		}
 		if err = t.extractImage(); err != nil {
+			t.dirimage = ""
 			return err
 		}
 	}
+	t.Command.Dir = t.dirimage
+	if chrooted {
+		t.Command.SysProcAttr = &syscall.SysProcAttr{Chroot: t.dirimage}
+	}
 	return t.Command.Start()
+}
+
+// StartChroot starts the command asynchronously in the chroot jail.
+func (t *Task) StartChroot() error {
+	return t.start(true)
 }
 
 // Extract a image in the dirimage

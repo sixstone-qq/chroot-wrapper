@@ -83,28 +83,43 @@ func TestStart(t *testing.T) {
 		}))
 	defer ts.Close()
 
-	task, err := CreateTask(ts.URL, "echo", "arg1", "arg2")
-	if err != nil {
-		t.Fatalf("Error creating task: %v", err)
-	}
+	// Test chroot case only if possible
+	var cases = []bool{false, true}
 
-	stdout, err := task.Command.StdoutPipe()
-	if err != nil {
-		t.Fatalf("Error creating stdout pipe: %v", err)
-	}
+	for _, chrooted := range cases {
+		task, err := CreateTask(ts.URL, "pwd")
+		if err != nil {
+			t.Fatalf("Error creating task: %v", err)
+		}
 
-	if err = task.Start(); err != nil {
-		t.Fatalf("Error starting a task: %v", err)
-	}
+		stdout, err := task.Command.StdoutPipe()
+		if err != nil {
+			t.Fatalf("Error creating stdout pipe: %v", err)
+		}
 
-	bytes, err := ioutil.ReadAll(stdout)
-	if err != nil {
-		t.Fatalf("Gathering output: %v", err)
-	}
-	t.Logf("Result from command: %s", bytes)
+		if chrooted && os.Geteuid() != 0 {
+			t.Log("Start a task in a chroot jail only possible with root")
+			break
+		}
 
-	if err = task.Command.Wait(); err != nil {
-		t.Fatalf("Error waiting for the task: %v", err)
+		if chrooted {
+			err = task.StartChroot()
+		} else {
+			err = task.Start()
+		}
+		if err != nil {
+			t.Fatalf("Error starting a task: %v", err)
+		}
+
+		bytes, err := ioutil.ReadAll(stdout)
+		if err != nil {
+			t.Fatalf("Gathering output: %v", err)
+		}
+		t.Logf("Result from command: %s", bytes)
+
+		if err = task.Command.Wait(); err != nil {
+			t.Fatalf("Error waiting for the task: %v", err)
+		}
 	}
 }
 
