@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 )
 
 const TaskFilePrefix = "task"
@@ -21,7 +22,7 @@ var SupportedSchemes = map[string]bool{
 
 type Task struct {
 	// Command to execute
-	Command string
+	Command *exec.Cmd
 	// URL the URL to an image which contains a FS
 	URL *url.URL
 	// temp file where the image is stored
@@ -41,9 +42,10 @@ func CreateTask(command string, rawurl string) (t *Task, err error) {
 	if URL.Scheme == "" {
 		URL.Scheme = "file"
 	}
-	t = new(Task)
-	t.Command = command
-	t.URL = URL
+	t = &Task{
+		Command: exec.Command(command),
+		URL:     URL,
+	}
 	return t, nil
 }
 
@@ -108,4 +110,14 @@ func (t *Task) Retrieve() (err error) {
 	err = IsValidImage(t.image.Name())
 
 	return err
+}
+
+// Start the command asynchronously
+func (t *Task) Start() (err error) {
+	if t.image == nil {
+		if err = t.Retrieve(); err != nil {
+			return err
+		}
+	}
+	return t.Command.Start()
 }

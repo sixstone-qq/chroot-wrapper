@@ -76,6 +76,24 @@ func TestFailHTTPRetrieve(test *testing.T) {
 	testRetrieve(test, ts.URL, true)
 }
 
+func TestStart(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			createGZTarContent(w, t)
+		}))
+	defer ts.Close()
+
+	task, err := CreateTask("ls", ts.URL)
+	if err != nil {
+		t.Error("Error creating task")
+		return
+	}
+
+	if err = task.Start(); err != nil {
+		t.Error("Error starting a task")
+	}
+}
+
 // Helper functions
 
 // Helper function to use for different backends
