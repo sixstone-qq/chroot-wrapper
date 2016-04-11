@@ -1,6 +1,8 @@
 package task
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +22,7 @@ var SupportedSchemes = map[string]bool{
 	"https": true,
 }
 
+// Task is a command + URL to an image
 type Task struct {
 	// Command to execute
 	Command *exec.Cmd
@@ -27,6 +30,10 @@ type Task struct {
 	URL *url.URL
 	// temp file where the image is stored
 	image *os.File
+	// compressed?
+	compressed bool
+	// extracted image directory
+	dirimage string
 }
 
 // CreateTask creates a task by parsing a url.
@@ -58,6 +65,9 @@ func checkedClose(f io.Closer, err *error) {
 
 // Close removes everything we did in the system
 func (t *Task) Close() {
+	if len(t.dirimage) > 0 {
+		os.RemoveAll(t.dirimage)
+	}
 	if t.image != nil {
 		os.Remove(t.image.Name())
 	}
@@ -106,8 +116,8 @@ func (t *Task) Retrieve() (err error) {
 	// I didn't manage to do that before downloading the whole
 	// file because of limitations in compress package to use with
 	// bufio.Reader
-	// Check if the image is a valid archive
-	err = IsValidImage(t.image.Name())
+	// Check if the image is a valid archive and it is compressed
+	t.compressed, err = ValidImage(t.image.Name())
 
 	return err
 }
@@ -118,6 +128,65 @@ func (t *Task) Start() (err error) {
 		if err = t.Retrieve(); err != nil {
 			return err
 		}
+		// Extract the content in dirimage
+		if t.dirimage, err = ioutil.TempDir("", TaskFilePrefix); err != nil {
+			return err
+		}
+		if err = t.extractImage(); err != nil {
+			return err
+		}
 	}
 	return t.Command.Start()
+}
+
+// Extract a image in the dirimage
+func (t *Task) extractImage() error {
+	var reader io.Reader
+
+	image, err := os.OpenFile(t.image.Name(), os.O_RDONLY, 0444)
+	if err != nil {
+		return err
+	}
+	defer checkedClose(image, &err)
+
+	if t.compressed {
+		if reader, err = gzip.NewReader(image); err != nil {
+			return err
+		}
+		defer checkedClose(reader.(io.Closer), &err)
+	} else {
+		reader = image
+	}
+	tr := tar.NewReader(reader)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			// End of the tar archive
+			break
+		} else if err != nil {
+			return err
+		}
+		path := hdr.Name
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err = os.MkdirAll(path, os.FileMode(hdr.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			f, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC, 0777)
+			if err != nil {
+				if f, err = os.Create(path); err != nil {
+					return err
+				}
+			}
+			defer checkedClose(f, &err)
+			if _, err = io.Copy(f, tr); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("Unknown type flag %c for path %s", hdr.Typeflag, path)
+		}
+	}
+
+	return err
 }

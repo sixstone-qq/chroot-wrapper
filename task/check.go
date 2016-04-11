@@ -27,26 +27,26 @@ func isTar(buf []byte) bool {
 		buf[261] == 0x72
 }
 
-// IsValidImage checks if a given file is a valid image
+// ValidImage checks if a given file is a valid image
 // Current supports: tar and gzip tar files
-func IsValidImage(srcFileName string) error {
+// It returns a bool indicating if the image is compressed and the
+// error if happens
+func ValidImage(srcFileName string) (bool, error) {
 	src, err := os.OpenFile(srcFileName, os.O_RDONLY, 0444)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer src.Close()
 	gzipped, err := checkCompress(src)
 	if err != nil {
-		return err
+		return false, err
 	}
+	defer gzipped.(io.Closer).Close()
 	supported, err := checkArchive(gzipped)
 	if !supported {
-		return errors.New("Unknown archive")
+		return gzipped != src, errors.New("Unknown archive")
 	}
-	if err != io.EOF {
-		return err
-	}
-	return nil
+	return gzipped != src, nil
 }
 
 // checkCompress checks if the file is compressed and returned the
@@ -63,7 +63,6 @@ func checkCompress(src io.ReadSeeker) (out io.Reader, err error) {
 	}
 	if isGzip(buf) {
 		out, err = gzip.NewReader(src)
-		//defer out.Close()
 		if err != nil {
 			return nil, err
 		}

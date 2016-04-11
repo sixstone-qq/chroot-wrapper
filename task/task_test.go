@@ -85,12 +85,12 @@ func TestStart(t *testing.T) {
 
 	task, err := CreateTask("ls", ts.URL)
 	if err != nil {
-		t.Error("Error creating task")
+		t.Errorf("Error creating task: %v", err)
 		return
 	}
 
 	if err = task.Start(); err != nil {
-		t.Error("Error starting a task")
+		t.Errorf("Error starting a task: %v", err)
 	}
 }
 
@@ -149,11 +149,11 @@ func createGZTarContent(src io.Writer, test *testing.T) (err error) {
 		}
 	}
 	// Make sure to check the error on Close
-	if err = tw.Close(); err != nil {
-		test.Errorf("Error closing TAR GZ file: %v", err)
-	}
 	if err = gw.Close(); err != nil {
 		test.Errorf("Error closing GZ file: %v", err)
+	}
+	if err = tw.Close(); err != nil {
+		test.Errorf("Error closing TAR GZ file: %v", err)
 	}
 	return err
 }
