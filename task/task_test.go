@@ -39,7 +39,7 @@ func TestFailFileRetrieve(test *testing.T) {
 	src, err := ioutil.TempFile("", "")
 	defer src.Close()
 	if err != nil {
-		test.Errorf("Impossible to create a temp file %v", err)
+		test.Fatalf("Impossible to create a temp file %v", err)
 	}
 	fileURL := new(url.URL)
 	fileURL.Scheme = "file"
@@ -50,13 +50,13 @@ func TestFailFileRetrieve(test *testing.T) {
 func TestGZTarFileRetrieve(test *testing.T) {
 	src, err := ioutil.TempFile("", "")
 	if err != nil {
-		test.Errorf("Impossible to create a temp file %v", err)
+		test.Fatalf("Impossible to create a temp file %v", err)
 	}
 	defer os.Remove(src.Name())
 	err = createGZTarContent(src, test)
 
 	if err = src.Close(); err != nil {
-		test.Errorf("Error closing file: %v", err)
+		test.Fatalf("Error closing file: %v", err)
 	}
 
 	fileURL := &url.URL{
@@ -127,25 +127,21 @@ func TestStart(t *testing.T) {
 
 // Helper function to use for different backends
 func testRetrieve(test *testing.T, rawurl string, shouldFail bool) {
-	t, err := CreateTask("cmd", rawurl)
+	t, err := CreateTask(rawurl, "cmd")
 	if err != nil {
-		test.Errorf("Impossible to create a task: %v", err)
-		return
+		test.Fatalf("Impossible to create a task: %v", err)
 	}
 	defer t.Close()
 	err = t.Retrieve()
 	if shouldFail && err == nil {
-		test.Errorf("It should fail on retrieving the task")
-		return
+		test.Fatalf("It should fail on retrieving the task")
 	}
 	if !shouldFail {
 		if err != nil {
-			test.Errorf("Error retrieving a task: %v", err)
-			return
+			test.Fatalf("Error retrieving a task: %v", err)
 		}
 		if t.ImagePath() == "" {
-			test.Errorf("Not possible to get the image path")
-			return
+			test.Fatalf("Not possible to get the image path")
 		}
 		test.Logf("Image path: %q", t.ImagePath())
 	}
@@ -169,20 +165,18 @@ func createGZTarContent(src io.Writer, test *testing.T) (err error) {
 			Typeflag: byte('0'),
 		}
 		if err = tw.WriteHeader(hdr); err != nil {
-			test.Errorf("Impossible to write TAR header: %v", err)
-			return
+			test.Fatalf("Impossible to write TAR header: %v", err)
 		}
 		if _, err = tw.Write([]byte(file.Body)); err != nil {
-			test.Errorf("Impossible to write file %q to TAR: %v", file.Name, err)
-			return
+			test.Fatalf("Impossible to write file %q to TAR: %v", file.Name, err)
 		}
 	}
 	// Make sure to check the error on Close
 	if err = gw.Close(); err != nil {
-		test.Errorf("Error closing GZ file: %v", err)
+		test.Fatalf("Error closing GZ file: %v", err)
 	}
 	if err = tw.Close(); err != nil {
-		test.Errorf("Error closing TAR GZ file: %v", err)
+		test.Fatalf("Error closing TAR GZ file: %v", err)
 	}
-	return err
+	return
 }
