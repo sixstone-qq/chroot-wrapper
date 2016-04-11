@@ -4,10 +4,12 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 )
 
@@ -50,9 +52,60 @@ func TestGZTarFileRetrieve(test *testing.T) {
 	if err != nil {
 		test.Errorf("Impossible to create a temp file %v", err)
 	}
-	test.Logf("File: %v", src.Name())
-	// defer os.Remove(src.Name())
+	defer os.Remove(src.Name())
+	err = createGZTarContent(src, test)
 
+	if err = src.Close(); err != nil {
+		test.Errorf("Error closing file: %v", err)
+	}
+
+	fileURL := &url.URL{
+		Scheme: "file",
+		Path:   src.Name(),
+	}
+	testRetrieve(test, fileURL.String(), false)
+}
+
+func TestFailHTTPRetrieve(test *testing.T) {
+	// Create a new HTTP server
+	ts := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "Hi!")
+		}))
+	defer ts.Close()
+	testRetrieve(test, ts.URL, true)
+}
+
+// Helper functions
+
+// Helper function to use for different backends
+func testRetrieve(test *testing.T, rawurl string, shouldFail bool) {
+	t, err := CreateTask("cmd", rawurl)
+	if err != nil {
+		test.Errorf("Impossible to create a task: %v", err)
+		return
+	}
+	defer t.Close()
+	err = t.Retrieve()
+	if shouldFail && err == nil {
+		test.Errorf("It should fail on retrieving the task")
+		return
+	}
+	if !shouldFail {
+		if err != nil {
+			test.Errorf("Error retrieving a task: %v", err)
+			return
+		}
+		if t.ImagePath() == "" {
+			test.Errorf("Not possible to get the image path")
+			return
+		}
+		test.Logf("Image path: %q", t.ImagePath())
+	}
+}
+
+// Helper to create a TAR GZ file
+func createGZTarContent(src io.Writer, test *testing.T) (err error) {
 	var files = []struct {
 		Name, Body string
 	}{
@@ -81,48 +134,8 @@ func TestGZTarFileRetrieve(test *testing.T) {
 	if err = tw.Close(); err != nil {
 		test.Errorf("Error closing TAR GZ file: %v", err)
 	}
-	gw.Close()
-	src.Close()
-
-	fileURL := &url.URL{
-		Scheme: "file",
-		Path:   src.Name(),
+	if err = gw.Close(); err != nil {
+		test.Errorf("Error closing GZ file: %v", err)
 	}
-	testRetrieve(test, fileURL.String(), false)
-}
-
-func TestFailHTTPRetrieve(test *testing.T) {
-	// Create a new HTTP server
-	ts := httptest.NewServer(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintln(w, "Hi!")
-		}))
-	defer ts.Close()
-	testRetrieve(test, ts.URL, true)
-}
-
-// Helper function to use for different backends
-func testRetrieve(test *testing.T, rawurl string, shouldFail bool) {
-	t, err := CreateTask("cmd", rawurl)
-	if err != nil {
-		test.Errorf("Impossible to create a task: %v", err)
-		return
-	}
-	defer t.Close()
-	err = t.Retrieve()
-	if shouldFail && err == nil {
-		test.Errorf("It should fail on retrieving the task")
-		return
-	}
-	if !shouldFail {
-		if err != nil {
-			test.Errorf("Error retrieving a task: %v", err)
-			return
-		}
-		if t.ImagePath() == "" {
-			test.Errorf("Not possible to get the image path")
-			return
-		}
-		test.Logf("Image path: %q", t.ImagePath())
-	}
+	return err
 }

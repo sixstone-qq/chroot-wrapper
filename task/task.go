@@ -25,7 +25,7 @@ type Task struct {
 	// URL the URL to an image which contains a FS
 	URL *url.URL
 	// temp file where the image is stored
-	tempfile *os.File
+	image *os.File
 }
 
 // CreateTask creates a task by parsing a url.
@@ -56,13 +56,14 @@ func checkedClose(f io.Closer, err *error) {
 
 // Close removes everything we did in the system
 func (t *Task) Close() {
-	if t.tempfile != nil {
-		os.Remove(t.tempfile.Name())
+	if t.image != nil {
+		os.Remove(t.image.Name())
 	}
 }
 
+// ImagePath returns the path where the image file is stored
 func (t *Task) ImagePath() string {
-	return t.tempfile.Name()
+	return t.image.Name()
 }
 
 // Retrieve gets the URL from and it stored in the temporary directory
@@ -90,13 +91,13 @@ func (t *Task) Retrieve() (err error) {
 		return fmt.Errorf("Invalid scheme %v", t.URL.Scheme)
 	}
 
-	if t.tempfile, err = ioutil.TempFile("", TaskFilePrefix); err != nil {
+	if t.image, err = ioutil.TempFile("", TaskFilePrefix); err != nil {
 		return err
 	}
 	// Close the temporary file after the copy
-	defer checkedClose(t.tempfile, &err)
+	defer checkedClose(t.image, &err)
 
-	if _, err = io.Copy(t.tempfile, src); err != nil {
+	if _, err = io.Copy(t.image, src); err != nil {
 		return err
 	}
 
@@ -104,7 +105,7 @@ func (t *Task) Retrieve() (err error) {
 	// file because of limitations in compress package to use with
 	// bufio.Reader
 	// Check if the image is a valid archive
-	err = IsValidImage(t.tempfile.Name())
+	err = IsValidImage(t.image.Name())
 
 	return err
 }
