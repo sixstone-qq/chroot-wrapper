@@ -24,7 +24,7 @@ var SupportedSchemes = map[string]bool{
 
 // Task is a command + URL to an image
 type Task struct {
-	// Command to execute
+	// Command to execute. It can be used to retrieve the results
 	Command *exec.Cmd
 	// URL the URL to an image which contains a FS
 	URL *url.URL
@@ -38,7 +38,7 @@ type Task struct {
 
 // CreateTask creates a task by parsing a url.
 // Current working URL schemes: file. Empty URL scheme implies file
-func CreateTask(command string, rawurl string) (t *Task, err error) {
+func CreateTask(rawurl string, command string, args ...string) (t *Task, err error) {
 	URL, err := url.Parse(rawurl)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func CreateTask(command string, rawurl string) (t *Task, err error) {
 		URL.Scheme = "file"
 	}
 	t = &Task{
-		Command: exec.Command(command),
+		Command: exec.Command(command, args...),
 		URL:     URL,
 	}
 	return t, nil

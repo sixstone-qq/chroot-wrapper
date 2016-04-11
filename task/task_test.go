@@ -25,7 +25,7 @@ func TestCreateTask(testSuite *testing.T) {
 	}
 
 	for _, test := range tests {
-		t, err := CreateTask("cmd", test.url)
+		t, err := CreateTask(test.url, "cmd")
 		if err == nil && test.shouldFail {
 			testSuite.Errorf("The url %q found unexpected error: %v", test.url, err)
 		}
@@ -83,14 +83,28 @@ func TestStart(t *testing.T) {
 		}))
 	defer ts.Close()
 
-	task, err := CreateTask("ls", ts.URL)
+	task, err := CreateTask(ts.URL, "echo", "arg1", "arg2")
 	if err != nil {
-		t.Errorf("Error creating task: %v", err)
-		return
+		t.Fatalf("Error creating task: %v", err)
+	}
+
+	stdout, err := task.Command.StdoutPipe()
+	if err != nil {
+		t.Fatalf("Error creating stdout pipe: %v", err)
 	}
 
 	if err = task.Start(); err != nil {
-		t.Errorf("Error starting a task: %v", err)
+		t.Fatalf("Error starting a task: %v", err)
+	}
+
+	bytes, err := ioutil.ReadAll(stdout)
+	if err != nil {
+		t.Fatalf("Gathering output: %v", err)
+	}
+	t.Logf("Result from command: %s", bytes)
+
+	if err = task.Command.Wait(); err != nil {
+		t.Fatalf("Error waiting for the task: %v", err)
 	}
 }
 
