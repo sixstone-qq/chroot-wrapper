@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -163,13 +164,50 @@ func TestStatus(test *testing.T) {
 	if status != Sleeping {
 		test.Fatalf(fatalErrf, Sleeping.String(), status)
 	}
-	// FIXME: Stopped status
-	err = t.Command.Wait()
-	if err != nil {
+	if err = t.Command.Wait(); err != nil {
 		test.Fatalf("Error waiting for task: %v", err)
 	}
 	if t.Status() != Finished {
 		test.Fatalf(fatalErrf, Finished.String(), t.Status())
+	}
+}
+
+func TestKillSignal(test *testing.T) {
+	fileURL := createTarGz(test)
+	defer os.Remove(fileURL.Path)
+	t, err := CreateTask(fileURL.String(), "sleep", "1")
+	if err != nil {
+		test.Fatalf("Cannot create task: %v", err)
+	}
+	defer t.Close()
+
+	// Test fail
+	if err = t.Signal(os.Kill); err == nil {
+		test.Fatalf("Cannot signal to a non-running process")
+	}
+
+	if err = t.Start(); err != nil {
+		test.Fatalf("Error starting task: %v", err)
+	}
+
+	if err = t.Signal(syscall.SIGSTOP); err != nil {
+		test.Fatalf("Fail to send signal: %v", err)
+	}
+
+	if t.Status() != Stopped {
+		test.Errorf("Process must be stopped: %s", t.Status())
+	}
+
+	if err = t.Signal(os.Kill); err != nil {
+		test.Fatalf("Process failed to kill: %v", err)
+	}
+
+	if err = t.Command.Wait(); err == nil {
+		test.Fatalf("Waiting: %v", err)
+	}
+
+	if t.Status() != Finished {
+		test.Fatalf("Process was not killed?")
 	}
 }
 

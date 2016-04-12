@@ -265,6 +265,14 @@ func procPidStat(pid int) (rune, error) {
 	return state, nil
 }
 
+// Signal a task with the given signal
+func (t *Task) Signal(sig os.Signal) error {
+	if t.Command.Process != nil {
+		return t.Command.Process.Signal(sig)
+	}
+	return fmt.Errorf("Impossible to send a signal to a non-running process")
+}
+
 // Extract a image in the dirimage
 func (t *Task) extractImage() (err error) {
 	var reader io.Reader
