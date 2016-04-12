@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestCreateTask(testSuite *testing.T) {
@@ -154,9 +155,13 @@ func TestStatus(test *testing.T) {
 	if err = t.Start(); err != nil {
 		test.Fatalf("Error starting task: %v", err)
 	}
+
+	c := time.After(10 * time.Millisecond)
+	<-c
+
 	status := t.Status()
-	if status != Running && status != Finished {
-		test.Fatalf("Task status: (%s or %s) != %s", Running.String(), Finished.String(), status)
+	if status != Sleeping {
+		test.Fatalf(fatalErrf, Sleeping.String(), status)
 	}
 	// FIXME: Stopped status
 	err = t.Command.Wait()

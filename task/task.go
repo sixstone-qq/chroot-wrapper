@@ -32,11 +32,13 @@ const (
 	Extracted
 	Running
 	Stopped
+	Sleeping
+	Zombie
 	Finished
 )
 
 // String representation of the task status
-var statusStrs = [...]string{"NotStarted", "Retrieved", "Extracted", "Running", "Stopped", "Finished"}
+var statusStrs = [...]string{"NotStarted", "Retrieved", "Extracted", "Running", "Stopped", "Sleeping", "Zombie", "Finished"}
 
 func (s Status) String() string {
 	return statusStrs[s]
@@ -232,6 +234,10 @@ func (t *Task) Status() Status {
 					switch state {
 					case 'T':
 						status = Stopped
+					case 'S':
+						status = Sleeping
+					case 'Z':
+						status = Zombie
 					default:
 						status = Running
 					}
@@ -255,7 +261,7 @@ func procPidStat(pid int) (rune, error) {
 	var p int
 	var procname string
 	var state rune
-	fmt.Fscanf(f, "%d (%s) %c", &p, &procname, &state)
+	fmt.Fscanf(f, "%d %s %c", &p, &procname, &state)
 	return state, nil
 }
 
