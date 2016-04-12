@@ -31,8 +31,8 @@ func (c *Container) Run() error {
 		return fmt.Errorf("Pivot root: %v", err)
 	}
 
-	log.Println("Launching ", name, c.Args[1:])
-	return syscall.Exec(name, c.Args[1:], os.Environ())
+	log.Println("Launching", name, c.Args[1:])
+	return syscall.Exec(name, c.Args, os.Environ())
 }
 
 // Use of pivot_root (2) in Linux

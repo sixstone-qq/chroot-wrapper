@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -189,7 +190,11 @@ func (t *Task) start(chrooted bool) (err error) {
 // StartChroot starts the command asynchronously in the chroot jail.
 // In Linux, it uses pivot_root to avoid scaling privileges
 func (t *Task) StartChroot() error {
-	return t.start(true)
+	err := t.start(true)
+	if err == nil {
+		log.Println("Container PID: ", t.Command.Process.Pid)
+	}
+	return err
 }
 
 // Extract a image in the dirimage
