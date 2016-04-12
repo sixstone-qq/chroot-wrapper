@@ -16,7 +16,10 @@ import (
 	"syscall"
 )
 
-const TaskFilePrefix = "task"
+const (
+	TaskFilePrefix = "task"
+	TaskForkName   = "tfork"
+)
 
 var SupportedSchemes = map[string]bool{
 	"":      true, // Empty scheme is translated to "file"
@@ -148,12 +151,43 @@ func (t *Task) start(chrooted bool) (err error) {
 	}
 	t.Command.Dir = t.dirimage
 	if chrooted {
-		t.Command.SysProcAttr = &syscall.SysProcAttr{Chroot: t.dirimage}
+		// FIXME: Check Linux
+		// Check the caps
+		if os.Getuid() == 0 {
+			t.Command.SysProcAttr = &syscall.SysProcAttr{Chroot: t.dirimage}
+		} else {
+			// Use unprivileged mode
+			// By calling the same program with different arguments
+			// See libcontainer doc for details
+			t.Command.Args = append([]string{TaskForkName}, t.Command.Args...)
+			t.Command.Path = "/proc/self/exe"
+			t.Command.SysProcAttr = &syscall.SysProcAttr{
+				Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+				UidMappings: []syscall.SysProcIDMap{
+					{
+						ContainerID: 0,
+						HostID:      os.Geteuid(),
+						Size:        1,
+					},
+				},
+				GidMappings: []syscall.SysProcIDMap{
+					{
+						ContainerID: 0,
+						HostID:      os.Getegid(),
+						Size:        1,
+					},
+				},
+			}
+			t.Command.Stdin = os.Stdin
+			t.Command.Stdout = os.Stdout
+			t.Command.Stderr = os.Stderr
+		}
 	}
 	return t.Command.Start()
 }
 
 // StartChroot starts the command asynchronously in the chroot jail.
+// In Linux, it uses pivot_root to avoid scaling privileges
 func (t *Task) StartChroot() error {
 	return t.start(true)
 }
@@ -251,4 +285,10 @@ func (t *Task) extractImage() error {
 	}
 
 	return err
+}
+
+// RunContainer sets up the view of the filesystem in namespaces and then run
+func RunContainer() error {
+	container := &Container{Args: os.Args[1:]}
+	return container.Run()
 }
