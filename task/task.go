@@ -214,8 +214,11 @@ func (t *Task) extractImage() error {
 				}
 			}
 			defer checkedClose(f, &err)
+			if err = os.Chmod(path, os.FileMode(hdr.Mode)); err != nil {
+				return fmt.Errorf("Chmod: %v", err)
+			}
 			if _, err = io.Copy(f, tr); err != nil {
-				return err
+				return fmt.Errorf("Copy: %v", err)
 			}
 		case tar.TypeSymlink:
 			target := hdr.Linkname
