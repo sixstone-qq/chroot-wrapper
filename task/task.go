@@ -173,7 +173,7 @@ func (t *Task) start(chrooted bool) (err error) {
 	if chrooted {
 		// FIXME: Check Linux
 		// Check the caps
-		if os.Getuid() == 0 {
+		if os.Geteuid() == 0 {
 			t.Command.SysProcAttr = &syscall.SysProcAttr{Chroot: t.dirimage}
 		} else {
 			// Use unprivileged mode
