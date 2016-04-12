@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -174,6 +176,21 @@ func (t *Task) extractImage() error {
 	} else {
 		reader = image
 	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("Getwd: %v", err)
+	}
+	if err = os.Chdir(t.dirimage); err != nil {
+		return fmt.Errorf("Chdir: %v", err)
+	}
+	defer func() {
+		cherr := os.Chdir(wd)
+		if err == nil && cherr != nil {
+			err = cherr
+		}
+	}()
+
 	tr := tar.NewReader(reader)
 	for {
 		hdr, err := tr.Next()
@@ -199,6 +216,31 @@ func (t *Task) extractImage() error {
 			defer checkedClose(f, &err)
 			if _, err = io.Copy(f, tr); err != nil {
 				return err
+			}
+		case tar.TypeSymlink:
+			target := hdr.Linkname
+			if filepath.IsAbs(hdr.Linkname) {
+				target = strings.TrimPrefix(hdr.Linkname, string(filepath.Separator))
+				target = filepath.Join(t.dirimage, target)
+				abspath := filepath.Dir(filepath.Join(t.dirimage, path))
+				if target, err = filepath.Rel(abspath, target); err != nil {
+					return err
+				}
+			}
+			if err = os.Symlink(target, path); err != nil {
+				switch err.(*os.LinkError).Err.Error() {
+				case "file exists": // Do nothing
+				case "no such file or directory":
+					// Create the target directory file first
+					if err = os.MkdirAll(filepath.Dir(target), 0777); err != nil {
+						return err
+					}
+					if err = os.Symlink(target, path); err != nil {
+						return fmt.Errorf("Symlink: %v", err)
+					}
+				default:
+					return fmt.Errorf("Symlink: %v", err)
+				}
 			}
 		default:
 			return fmt.Errorf("Unknown type flag %c for path %s", hdr.Typeflag, path)
