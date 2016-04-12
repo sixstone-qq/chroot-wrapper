@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -21,6 +22,25 @@ const (
 	TaskFilePrefix = "task"
 	TaskForkName   = "tfork"
 )
+
+// Status of a task
+type Status int
+
+const (
+	NotStarted Status = iota
+	Retrieved
+	Extracted
+	Running
+	Stopped
+	Finished
+)
+
+// String representation of the task status
+var statusStrs = [...]string{"NotStarted", "Retrieved", "Extracted", "Running", "Stopped", "Finished"}
+
+func (s Status) String() string {
+	return statusStrs[s]
+}
 
 var SupportedSchemes = map[string]bool{
 	"":      true, // Empty scheme is translated to "file"
@@ -142,9 +162,6 @@ func (t *Task) start(chrooted bool) (err error) {
 	}
 	if len(t.dirimage) == 0 {
 		// Extract the content in dirimage
-		if t.dirimage, err = ioutil.TempDir("", TaskFilePrefix); err != nil {
-			return err
-		}
 		if err = t.extractImage(); err != nil {
 			t.dirimage = ""
 			return err
@@ -197,19 +214,68 @@ func (t *Task) StartChroot() error {
 	return err
 }
 
+// Status returns the current status of the task
+func (t *Task) Status() Status {
+	status := NotStarted
+	if t.image != nil {
+		status = Retrieved
+	}
+	if len(t.dirimage) > 0 {
+		status = Extracted
+	}
+	if t.Command.Process != nil {
+		p, err := os.FindProcess(t.Command.Process.Pid)
+		if err == nil {
+			if p != nil {
+				if t.Command.ProcessState == nil {
+					state, _ := procPidStat(t.Command.Process.Pid)
+					switch state {
+					case 'T':
+						status = Stopped
+					default:
+						status = Running
+					}
+				} else {
+					status = Finished
+				}
+			}
+		}
+	}
+	return status
+}
+
+// Get the real state of the running process using `proc` FS
+// It can return RSDZTW as stated by man 5 proc
+func procPidStat(pid int) (rune, error) {
+	filename := filepath.Join(string(filepath.Separator), "proc", strconv.FormatInt(int64(pid), 10), "stat")
+	f, err := os.Open(filename)
+	if err != nil {
+		return 0, err
+	}
+	var p int
+	var procname string
+	var state rune
+	fmt.Fscanf(f, "%d (%s) %c", &p, &procname, &state)
+	return state, nil
+}
+
 // Extract a image in the dirimage
-func (t *Task) extractImage() error {
+func (t *Task) extractImage() (err error) {
 	var reader io.Reader
+
+	if t.dirimage, err = ioutil.TempDir("", TaskFilePrefix); err != nil {
+		return fmt.Errorf("TempDir: %v", err)
+	}
 
 	image, err := os.OpenFile(t.image.Name(), os.O_RDONLY, 0444)
 	if err != nil {
-		return err
+		return
 	}
 	defer checkedClose(image, &err)
 
 	if t.compressed {
 		if reader, err = gzip.NewReader(image); err != nil {
-			return err
+			return
 		}
 		defer checkedClose(reader.(io.Closer), &err)
 	} else {
@@ -288,8 +354,7 @@ func (t *Task) extractImage() error {
 			return fmt.Errorf("Unknown type flag %c for path %s", hdr.Typeflag, path)
 		}
 	}
-
-	return err
+	return
 }
 
 // RunContainer sets up the view of the filesystem in namespaces and then run

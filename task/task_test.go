@@ -48,21 +48,8 @@ func TestFailFileRetrieve(test *testing.T) {
 }
 
 func TestGZTarFileRetrieve(test *testing.T) {
-	src, err := ioutil.TempFile("", "")
-	if err != nil {
-		test.Fatalf("Impossible to create a temp file %v", err)
-	}
-	defer os.Remove(src.Name())
-	err = createGZTarContent(src, test)
-
-	if err = src.Close(); err != nil {
-		test.Fatalf("Error closing file: %v", err)
-	}
-
-	fileURL := &url.URL{
-		Scheme: "file",
-		Path:   src.Name(),
-	}
+	fileURL := createTarGz(test)
+	defer os.Remove(fileURL.Path)
 	testRetrieve(test, fileURL.String(), false)
 }
 
@@ -109,7 +96,7 @@ func TestStart(t *testing.T) {
 				t.Error("Chroot tests must fail")
 				continue
 			} else {
-				// We cannot more here
+				// We cannot do more here
 				task.Close()
 				continue
 			}
@@ -136,7 +123,72 @@ func TestStart(t *testing.T) {
 	}
 }
 
+func TestStatus(test *testing.T) {
+	fatalErrf := "Task status: %s != %s"
+	fileURL := createTarGz(test)
+	defer os.Remove(fileURL.Path)
+	t, err := CreateTask(fileURL.String(), "sleep", "1")
+	if err != nil {
+		test.Fatalf("Cannot create task: %v", err)
+	}
+	defer t.Close()
+	if t.Status() != NotStarted {
+		test.Fatalf(fatalErrf, NotStarted.String(), t.Status())
+	}
+
+	// This results will be probably internal only
+	if err = t.Retrieve(); err != nil {
+		test.Fatalf("Error retrieving a task: %v", err)
+	}
+	if t.Status() != Retrieved {
+		test.Fatalf(fatalErrf, Retrieved.String(), t.Status())
+	}
+
+	if err = t.extractImage(); err != nil {
+		test.Fatalf("Error extracting imaged: %v", err)
+	}
+	if t.Status() != Extracted {
+		test.Fatalf(fatalErrf, Extracted.String(), t.Status())
+	}
+
+	if err = t.Start(); err != nil {
+		test.Fatalf("Error starting task: %v", err)
+	}
+	status := t.Status()
+	if status != Running && status != Finished {
+		test.Fatalf("Task status: (%s or %s) != %s", Running.String(), Finished.String(), status)
+	}
+	// FIXME: Stopped status
+	err = t.Command.Wait()
+	if err != nil {
+		test.Fatalf("Error waiting for task: %v", err)
+	}
+	if t.Status() != Finished {
+		test.Fatalf(fatalErrf, Finished.String(), t.Status())
+	}
+}
+
 // Helper functions
+
+// Create a temporary tar.gz file
+// It is the caller's responsability to remove the temporary file
+func createTarGz(test *testing.T) *url.URL {
+	src, err := ioutil.TempFile("", "")
+	if err != nil {
+		test.Fatalf("Impossible to create a temp file %v", err)
+	}
+	err = createGZTarContent(src, test)
+
+	if err = src.Close(); err != nil {
+		test.Fatalf("Error closing file: %v", err)
+	}
+
+	fileURL := &url.URL{
+		Scheme: "file",
+		Path:   src.Name(),
+	}
+	return fileURL
+}
 
 // Helper function to use for different backends
 func testRetrieve(test *testing.T, rawurl string, shouldFail bool) {
