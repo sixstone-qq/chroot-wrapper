@@ -67,8 +67,19 @@ func main() {
 		if err := task.QuerySupervisor(task.StatusQuery); err != nil {
 			log.Fatalf("Error querying task status: %v", err)
 		}
+	case "kill":
+		var signal string
+		if len(opts.Args) >= 1 {
+			signal = opts.Args[0]
+		} else {
+			signal = "SIGKILL"
+		}
+
+		if err := task.QuerySupervisor(task.SignalQuery, signal); err != nil {
+			log.Fatalf("Error sending signal to task: %v", err)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "Missing subcommand parameter, available subcommands:\n\n")
-		fmt.Fprintf(os.Stderr, "  run, ps\n")
+		fmt.Fprintf(os.Stderr, "  run, ps, kill\n")
 	}
 }
