@@ -32,22 +32,43 @@ func main() {
 			opts.Usage()
 			break
 		}
-		task, err := task.CreateTask(opts.Args[0], opts.Args[1], opts.Args[2:]...)
-		if err != nil {
-			log.Fatalf("Impossible to create task: %v", err)
-		}
-		defer task.Close()
 
-		err = task.StartChroot()
-		if err != nil {
-			log.Fatalf("Impossible to start task: %v", err)
-		}
+		done := make(chan struct{})
+		tc := make(chan *task.Task)
+		go func(taskChan chan *task.Task, end chan struct{}) {
+			defer close(end)
+			defer close(taskChan)
+			task, err := task.CreateTask(opts.Args[0], opts.Args[1], opts.Args[2:]...)
+			if err != nil {
+				log.Fatalf("Impossible to create task: %v", err)
+			}
+			defer task.Close()
+			taskChan <- task
 
-		if err = task.Command.Wait(); err != nil {
-			log.Fatalf("Error waiting for the task: %v", err)
+			err = task.StartChroot()
+			if err != nil {
+				log.Fatalf("Impossible to start task: %v", err)
+			}
+
+			if err = task.Command.Wait(); err != nil {
+				log.Fatalf("Error waiting for the task: %v", err)
+			}
+		}(tc, done)
+
+		go func() {
+			supervisor := task.NewSupervisor(tc)
+			// It is ended by main goroutine when it exits
+			supervisor.ListenAndServe()
+		}()
+
+		<-done
+		fmt.Println("End!")
+	case "ps":
+		if err := task.QuerySupervisor(task.StatusQuery); err != nil {
+			log.Fatalf("Error querying task status: %v", err)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Missing subcommand parameter, available subcommands:\n\n")
-		fmt.Fprintf(os.Stderr, "  run\n")
+		fmt.Fprintf(os.Stderr, "  run, ps\n")
 	}
 }
