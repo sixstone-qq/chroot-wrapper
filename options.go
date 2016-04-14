@@ -25,7 +25,7 @@ type Options struct {
 	Dir string
 }
 
-// Default options
+// DefaultListeningPort is the port used by the supervisor to accept queries on tasks
 const DefaultListeningPort = 6969
 
 // Usage prints usage from the options
@@ -43,6 +43,7 @@ func (o *Options) Environ() []string {
 	return res
 }
 
+// PrintSubcommandsUsage prints the usage of subcommands
 func PrintSubcommandsUsage() {
 	fmt.Fprintf(os.Stderr, "\t [-env=[]|-wd] run URL|path cmd [args...]\n\n")
 	fmt.Fprintf(os.Stderr, "\t\tRun cmd inside an image (jailed) which is available at the given URL.\n\t\tOnly file and HTTP(S) schemes are supported.\n\t\tOnly TAR images compressed or not with GZ are supported\n\n")
@@ -53,6 +54,7 @@ func PrintSubcommandsUsage() {
 	fmt.Fprintf(os.Stderr, "\t\tPossible signal values: SIGKILL (default), SIGTERM, SIGUSR1, SIGUSR2, SIGSTOP, SIGCONT, SIGINT\n")
 }
 
+// UserOptions returns the options from `os.Args`
 func UserOptions() *Options {
 	return setupUserOptions(os.Args[1:], flag.ExitOnError)
 }
