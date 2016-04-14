@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -11,7 +12,10 @@ import (
 func main() {
 	if os.Args[0] == task.TaskForkName {
 		// Create the view of the system and exec
-		if err := task.RunContainer(); err != nil {
+		var wd string
+		flag.StringVar(&wd, "wd", "", "Working directory to exec")
+		flag.Parse()
+		if err := task.RunContainer(wd); err != nil {
 			log.Fatalf("Run container error: %v", err)
 		}
 		os.Exit(0)
@@ -46,7 +50,8 @@ func main() {
 			defer task.Close()
 			taskChan <- task
 
-			err = task.StartChroot(append(opts.Environ(), os.Environ()...))
+			err = task.StartChroot(opts.Dir,
+				append(opts.Environ(), os.Environ()...))
 			if err != nil {
 				log.Fatalf("Impossible to start task: %v", err)
 			}

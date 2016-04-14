@@ -37,6 +37,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// Basic start task test
 func TestStartTask(t *testing.T) {
 	if len(*testImage) == 0 {
 		t.Skip("Test image not available. Use -test-image to set it")
@@ -124,5 +125,22 @@ func TestKillTask(t *testing.T) {
 	err = cmd.Wait()
 	if err != nil {
 		t.Errorf("Normal end instead of signaled")
+	}
+}
+
+// Test working directory
+func TestWDTask(t *testing.T) {
+	if len(*testImage) == 0 {
+		t.Skip("Test image not available. Use -test-image to set it")
+	}
+	cmd := exec.Command(chrootWrapperBinary, "-wd", "/bin", "run", *testImage, "pwd")
+
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Output: %s\n", out)
+		t.Fatalf("Failed to run: %v", err)
+	}
+	if !strings.Contains(string(out), "/bin\n") {
+		t.Errorf("Expected out is /bin != %s", out)
 	}
 }

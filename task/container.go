@@ -17,7 +17,8 @@ type Container struct {
 	Args []string
 }
 
-func (c *Container) Run() error {
+// Run the given exec inside a container with a working directory
+func (c *Container) Run(wdir string) error {
 	name, err := exec.LookPath(c.Args[0])
 	if err != nil {
 		return fmt.Errorf("LookPath: %v", err)
@@ -27,11 +28,16 @@ func (c *Container) Run() error {
 		return fmt.Errorf("Getwd: %v", err)
 	}
 	// Set up the container environment
-	if err := pivotRoot(wd); err != nil {
+	if err = pivotRoot(wd); err != nil {
 		return fmt.Errorf("Pivot root: %v", err)
 	}
 
 	log.Println("Launching", name, c.Args[1:])
+	if wdir != "" {
+		if err = os.Chdir(wdir); err != nil {
+			return fmt.Errorf("Chdir: %v", err)
+		}
+	}
 	return syscall.Exec(name, c.Args, os.Environ())
 }
 

@@ -21,6 +21,8 @@ type Options struct {
 	ListeningPort int `cfg: "port"`
 	// Environment variables to pass to the task
 	env map[string]string `cfg: "env"`
+	// Working directory for the task
+	Dir string
 }
 
 // Default options
@@ -42,8 +44,8 @@ func (o *Options) Environ() []string {
 }
 
 func PrintSubcommandsUsage() {
-	fmt.Fprintf(os.Stderr, "\t [-env=[]] run URL|path cmd [args...]\n\n")
-	fmt.Fprintf(os.Stderr, "\t\tRun cmd inside an image (jailed) which is available at the given URL.\n\t\tOnly file and HTTP(S) schemes are supported.\n\t\tOnly TAR images compressed or not with GZ are supported\n")
+	fmt.Fprintf(os.Stderr, "\t [-env=[]|-wd] run URL|path cmd [args...]\n\n")
+	fmt.Fprintf(os.Stderr, "\t\tRun cmd inside an image (jailed) which is available at the given URL.\n\t\tOnly file and HTTP(S) schemes are supported.\n\t\tOnly TAR images compressed or not with GZ are supported\n\n")
 	fmt.Fprintf(os.Stderr, "\t ps\n\n")
 	fmt.Fprintf(os.Stderr, "\t\tGet the status of task launched with run subcommand\n\n")
 	fmt.Fprintf(os.Stderr, "\t kill [signal]\n\n")
@@ -61,6 +63,7 @@ func setupUserOptions(args []string, errorHandling flag.ErrorHandling) *Options 
 	flagSet := flag.NewFlagSet("chroot-wrapper", errorHandling)
 	flagSet.Int("port", opts.ListeningPort, "Supervisor listening port to query task")
 	flagSet.String("env", "", "New environment variables available for the task")
+	flagSet.String("wd", "", "Working directory to run the task")
 	flagSet.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage %s [flags] <subcommand> [arguments]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  Available subcommands: run, ps, kill\n\n")
@@ -95,6 +98,7 @@ func setupUserOptions(args []string, errorHandling flag.ErrorHandling) *Options 
 			opts.env[kvs[0]] = kvs[1]
 		}
 	}
+	opts.Dir = flagSet.Lookup("wd").Value.String()
 
 	return opts
 }

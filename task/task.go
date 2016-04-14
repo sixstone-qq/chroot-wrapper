@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -158,12 +159,13 @@ func (t *Task) Retrieve() (err error) {
 	return err
 }
 
-// Start the command asynchronously
-func (t *Task) Start(env []string) error {
-	return t.start(false, env)
+// Start the command asynchronously with wd as working directory and
+// env with the environment variables
+func (t *Task) Start(wd string, env []string) error {
+	return t.start(false, wd, env)
 }
 
-func (t *Task) start(chrooted bool, env []string) (err error) {
+func (t *Task) start(chrooted bool, wd string, env []string) (err error) {
 	t.Lock()
 	defer t.Unlock()
 	if t.image == nil {
@@ -188,7 +190,11 @@ func (t *Task) start(chrooted bool, env []string) (err error) {
 			// Use unprivileged mode
 			// By calling the same program with different arguments
 			// See libcontainer doc for details
-			t.Command.Args = append([]string{TaskForkName}, t.Command.Args...)
+			args := []string{TaskForkName}
+			if wd != "" {
+				args = append(args, "-wd", wd)
+			}
+			t.Command.Args = append(args, t.Command.Args...)
 			t.Command.Path = "/proc/self/exe"
 			t.Command.SysProcAttr = &syscall.SysProcAttr{
 				Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
@@ -211,7 +217,10 @@ func (t *Task) start(chrooted bool, env []string) (err error) {
 			t.Command.Stdout = os.Stdout
 			t.Command.Stderr = os.Stderr
 		}
+	} else if wd != "" {
+		t.Command.Dir = wd
 	}
+
 	if len(env) > 0 {
 		t.Command.Env = env
 	}
@@ -220,9 +229,9 @@ func (t *Task) start(chrooted bool, env []string) (err error) {
 
 // StartChroot starts the command asynchronously in the chroot jail.
 // In Linux, it uses pivot_root to avoid scaling privileges
-// Pass environment variables from env
-func (t *Task) StartChroot(env []string) error {
-	err := t.start(true, env)
+// Pass environment variables from env and working directory set to wd
+func (t *Task) StartChroot(wd string, env []string) error {
+	err := t.start(true, wd, env)
 	if err == nil {
 		log.Println("Container PID: ", t.Command.Process.Pid)
 	}
@@ -389,7 +398,7 @@ func (t *Task) extractImage() (err error) {
 }
 
 // RunContainer sets up the view of the filesystem in namespaces and then run
-func RunContainer() error {
-	container := &Container{Args: os.Args[1:]}
-	return container.Run()
+func RunContainer(wd string) error {
+	container := &Container{Args: os.Args[flag.NFlag()*2+1:]}
+	return container.Run(wd)
 }
