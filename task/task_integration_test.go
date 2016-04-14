@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
+	"time"
 )
 
 // chroot-wrapper binary
@@ -39,7 +41,7 @@ func TestStartTask(t *testing.T) {
 	if len(*testImage) == 0 {
 		t.Skip("Test image not available. Use -test-image to set it")
 	}
-	cmd := exec.Command(chrootWrapperBinary, *testImage, "pwd")
+	cmd := exec.Command(chrootWrapperBinary, "run", *testImage, "pwd")
 
 	out, err := cmd.Output()
 	if err != nil {
@@ -48,5 +50,79 @@ func TestStartTask(t *testing.T) {
 	}
 	if string(out) != "/\n" {
 		t.Errorf("Expected out is / != %s", out)
+	}
+}
+
+// Test signal a task and status
+// Start a task, stop it, start it and kill it
+func TestKillTask(t *testing.T) {
+	if len(*testImage) == 0 {
+		t.Skip("Test image not available. Use -test-image to set it")
+	}
+	// Start it!
+	cmd := exec.Command(chrootWrapperBinary, "-port", "8888", "run", *testImage,
+		"sleep", "1000")
+
+	err := cmd.Start()
+	if err != nil {
+		t.Fatalf("Failed to start: %v", err)
+	}
+
+	// Wait a little
+	time.Sleep(1 * time.Second)
+
+	// Stop it!
+	killCmd := exec.Command(chrootWrapperBinary, "-port", "8888", "kill", "SIGSTOP")
+	out, err := killCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to stop the task: %v", err)
+	}
+	if !strings.Contains(string(out), "Signaled") {
+		t.Errorf("The output from kill was not correct: %s", out)
+	}
+
+	statusCmd := exec.Command(chrootWrapperBinary, "-port", "8888", "ps")
+	out, err = statusCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to stat the task: %v", err)
+	}
+	if !strings.Contains(string(out), "Stopped") {
+		t.Errorf("Status %s different from Stopped", out)
+	}
+
+	// Resume it!
+	killCmd = exec.Command(chrootWrapperBinary, "-port", "8888", "kill", "SIGCONT")
+	out, err = killCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to continue the task: %v", err)
+	}
+	if !strings.Contains(string(out), "Signaled") {
+		t.Errorf("The output from kill was not correct: %s", out)
+	}
+
+	statusCmd = exec.Command(chrootWrapperBinary, "-port", "8888", "ps")
+	out, err = statusCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to stat the task: %v", err)
+	}
+	if !(strings.Contains(string(out), "Sleeping") ||
+		!strings.Contains(string(out), "Running")) {
+		t.Errorf("Status %s different from Sleeping|Running", out)
+	}
+
+	// Terminate it!
+	killCmd = exec.Command(chrootWrapperBinary, "-port", "8888", "kill", "SIGTERM")
+	out, err = killCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to terminate the task: %v", err)
+	}
+	if !strings.Contains(string(out), "Signaled") {
+		t.Errorf("The output from kill was not correct: %s", out)
+	}
+
+	// Check the end was by a signal
+	err = cmd.Wait()
+	if err != nil {
+		t.Errorf("Normal end instead of signaled")
 	}
 }

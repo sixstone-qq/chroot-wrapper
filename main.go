@@ -52,7 +52,7 @@ func main() {
 			}
 
 			if err = task.Command.Wait(); err != nil {
-				log.Fatalf("Error waiting for the task: %v", err)
+				log.Printf("ERROR: waiting for the task: %v", err)
 			}
 		}(tc, done)
 
@@ -88,7 +88,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  run, ps, kill\n")
 	}
 	if err != nil {
-		// Give some hint
-		fmt.Fprintf(os.Stderr, "%s\nIs task running or in a different port?\n", err)
+		if opts.Command == "ps" || opts.Command == "kill" {
+			// Give some hint
+			fmt.Fprintf(os.Stderr, "%s\nIs task running or in a different port?\n", err)
+		}
+		os.Exit(1)
 	}
 }
