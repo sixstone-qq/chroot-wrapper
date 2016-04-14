@@ -59,11 +59,14 @@ func main() {
 		go func() {
 			supervisor := task.NewSupervisor(tc, opts.ListeningPort)
 			// It is ended by main goroutine when it exits
-			supervisor.ListenAndServe()
+			if serr := supervisor.ListenAndServe(); serr != nil {
+				log.Printf("WARN: Supervisor cannot listen at %d: %s", opts.ListeningPort, serr)
+				log.Printf("WARN: No possible to query the task later")
+			}
 		}()
 
+		// Wait for the task to exit
 		<-done
-		fmt.Println("End!")
 	case "ps":
 		if err = task.QuerySupervisor(opts.ListeningPort, task.StatusQuery); err != nil {
 
