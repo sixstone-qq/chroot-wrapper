@@ -1,3 +1,4 @@
+// Tasks are commands run inside an image retrieved from a URL.
 package task
 
 import (
@@ -68,8 +69,9 @@ type Task struct {
 	dirimage string
 }
 
-// CreateTask creates a task by parsing a url.
-// Current working URL schemes: file. Empty URL scheme implies file
+// CreateTask creates a task by parsing a URL.
+//
+// Current working URL schemes: file and http(s). Empty URL scheme implies file
 func CreateTask(rawurl string, command string, args ...string) (t *Task, err error) {
 	URL, err := url.Parse(rawurl)
 	if err != nil {
@@ -116,7 +118,7 @@ func (t *Task) ImagePath() string {
 }
 
 // Retrieve gets the URL from and it stored in the temporary directory
-// as temporary file. See io/ioutil for details.
+// as temporary file. See `os.TempDir` for details.
 func (t *Task) Retrieve() (err error) {
 	var src io.Reader
 	switch t.URL.Scheme {
@@ -228,7 +230,8 @@ func (t *Task) start(chrooted bool, wd string, env []string) (err error) {
 }
 
 // StartChroot starts the command asynchronously in the chroot jail.
-// In Linux, it uses pivot_root to avoid scaling privileges
+// In Linux, it uses pivot_root to avoid scaling privileges.
+//
 // Pass environment variables from env and working directory set to wd
 func (t *Task) StartChroot(wd string, env []string) error {
 	err := t.start(true, wd, env)

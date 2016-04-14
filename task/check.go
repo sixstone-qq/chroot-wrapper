@@ -11,26 +11,27 @@ import (
 )
 
 const (
-	CompressHeader = 3
-	ArchiveHeader  = 262
+	compressHeader = 3
+	archiveHeader  = 262
 )
 
 func isGzip(buf []byte) bool {
-	return len(buf) > CompressHeader-1 &&
+	return len(buf) > compressHeader-1 &&
 		buf[0] == 0x1F && buf[1] == 0x8B && buf[2] == 0x8
 }
 
 func isTar(buf []byte) bool {
-	return len(buf) > ArchiveHeader-1 &&
+	return len(buf) > archiveHeader-1 &&
 		buf[257] == 0x75 && buf[258] == 0x73 &&
 		buf[259] == 0x74 && buf[260] == 0x61 &&
 		buf[261] == 0x72
 }
 
-// ValidImage checks if a given file is a valid image
-// Current supports: tar and gzip tar files
+// ValidImage checks if a given file is a valid image. It currently
+// supports: tar and gzip tar files.
+//
 // It returns a bool indicating if the image is compressed and the
-// error if happens
+// error if happens.
 func ValidImage(srcFileName string) (bool, error) {
 	src, err := os.OpenFile(srcFileName, os.O_RDONLY, 0444)
 	if err != nil {
@@ -53,7 +54,7 @@ func ValidImage(srcFileName string) (bool, error) {
 // compress reader in that case
 // It returns the compressed reader or the same reader if it is not compressed.
 func checkCompress(src io.ReadSeeker) (out io.Reader, err error) {
-	buf := make([]byte, CompressHeader)
+	buf := make([]byte, compressHeader)
 	n_read, err := src.Read(buf)
 	if n_read > 0 {
 		// Rewind

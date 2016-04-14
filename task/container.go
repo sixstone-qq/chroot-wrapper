@@ -1,8 +1,8 @@
-// Reference: http://lk4d4.darth.io/posts/unpriv3/
 package task
 
 // Unpriviliged way to run a command inside a jail (chrooted) using
 // mount namespaces from linux OS
+// Reference: http://lk4d4.darth.io/posts/unpriv3/
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ type Container struct {
 	Args []string
 }
 
-// Run the given exec inside a container with a working directory
+// Run the given exec inside a container from a working directory
 func (c *Container) Run(wdir string) error {
 	name, err := exec.LookPath(c.Args[0])
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"syscall"
 )
 
+// Supervisor is a HTTP server which serve requests on a stored task
 type Supervisor struct {
 	Task *Task
 	HTTP *http.Server
@@ -24,7 +25,7 @@ const (
 	SignalQuery SupervisorQuery = "kill"
 )
 
-const StatusUnprocessableEntity = 422
+const statusUnprocessableEntity = 422
 
 type SignalPayload struct {
 	Signal string `json:"signal"`
@@ -52,7 +53,7 @@ func NewSupervisor(tc <-chan *Task, listeningPort int) *Supervisor {
 			jsonDec := json.NewDecoder(r.Body)
 			var payload SignalPayload
 			if err := jsonDec.Decode(&payload); err != nil {
-				w.WriteHeader(StatusUnprocessableEntity)
+				w.WriteHeader(statusUnprocessableEntity)
 				if err := json.NewEncoder(w).Encode(err); err != nil {
 					panic(err)
 				}
