@@ -4,6 +4,7 @@ package task
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -94,7 +95,7 @@ func TestStart(t *testing.T) {
 		}
 
 		if chrooted {
-			err = task.StartChroot()
+			err = task.StartChroot(nil)
 			if err == nil {
 				// This should fail
 				t.Error("Chroot tests must fail")
@@ -105,7 +106,7 @@ func TestStart(t *testing.T) {
 				continue
 			}
 		} else {
-			err = task.Start()
+			err = task.Start(nil)
 		}
 		if err != nil {
 			t.Errorf("Error starting a task: %v", err)
@@ -155,7 +156,7 @@ func TestStatus(test *testing.T) {
 		test.Fatalf(fatalErrf, Extracted.String(), t.Status())
 	}
 
-	if err = t.Start(); err != nil {
+	if err = t.Start(nil); err != nil {
 		test.Fatalf("Error starting task: %v", err)
 	}
 
@@ -188,7 +189,7 @@ func TestKillSignal(test *testing.T) {
 		test.Fatalf("Cannot signal to a non-running process")
 	}
 
-	if err = t.Start(); err != nil {
+	if err = t.Start(nil); err != nil {
 		test.Fatalf("Error starting task: %v", err)
 	}
 
@@ -210,6 +211,29 @@ func TestKillSignal(test *testing.T) {
 
 	if t.Status() != Finished {
 		test.Fatalf("Process was not killed?")
+	}
+}
+
+func TestEnv(test *testing.T) {
+	fileURL := createTarGz(test)
+	defer os.Remove(fileURL.Path)
+	t, err := CreateTask(fileURL.String(), "/usr/bin/env")
+	if err != nil {
+		test.Fatalf("Cannot create task: %v", err)
+	}
+	defer t.Close()
+
+	var out bytes.Buffer
+	t.Command.Stdout = &out
+	if err = t.Start([]string{"korn=light"}); err != nil {
+		test.Fatalf("Error starting task: %v", err)
+	}
+
+	if err = t.Command.Wait(); err != nil {
+		test.Fatalf("Waiting: %v", err)
+	}
+	if out.String() != "korn=light\n" {
+		test.Errorf("Out: %s incorrect", out)
 	}
 }
 

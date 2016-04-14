@@ -46,7 +46,7 @@ func main() {
 			defer task.Close()
 			taskChan <- task
 
-			err = task.StartChroot()
+			err = task.StartChroot(append(opts.Environ(), os.Environ()...))
 			if err != nil {
 				log.Fatalf("Impossible to start task: %v", err)
 			}

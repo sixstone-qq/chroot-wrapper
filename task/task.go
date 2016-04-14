@@ -159,11 +159,11 @@ func (t *Task) Retrieve() (err error) {
 }
 
 // Start the command asynchronously
-func (t *Task) Start() error {
-	return t.start(false)
+func (t *Task) Start(env []string) error {
+	return t.start(false, env)
 }
 
-func (t *Task) start(chrooted bool) (err error) {
+func (t *Task) start(chrooted bool, env []string) (err error) {
 	t.Lock()
 	defer t.Unlock()
 	if t.image == nil {
@@ -212,13 +212,17 @@ func (t *Task) start(chrooted bool) (err error) {
 			t.Command.Stderr = os.Stderr
 		}
 	}
+	if len(env) > 0 {
+		t.Command.Env = env
+	}
 	return t.Command.Start()
 }
 
 // StartChroot starts the command asynchronously in the chroot jail.
 // In Linux, it uses pivot_root to avoid scaling privileges
-func (t *Task) StartChroot() error {
-	err := t.start(true)
+// Pass environment variables from env
+func (t *Task) StartChroot(env []string) error {
+	err := t.start(true, env)
 	if err == nil {
 		log.Println("Container PID: ", t.Command.Process.Pid)
 	}
