@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"syscall"
@@ -28,6 +29,8 @@ const StatusUnprocessableEntity = 422
 type SignalPayload struct {
 	Signal string `json:"signal"`
 }
+
+// Server side
 
 // NewSupervisor creates a task supervisor from a task received from
 // the channel
@@ -72,8 +75,9 @@ func NewSupervisor(tc <-chan *Task) *Supervisor {
 				signal = syscall.SIGUSR2
 			default:
 				w.WriteHeader(http.StatusBadRequest)
-				serr := fmt.Errorf("Invalid signal. Choices: SIGKILL, SIGINT, SIGSTOP, SIGTERM, SIGUSR1, SIGUSR2")
-				if err := json.NewEncoder(w).Encode(serr); err != nil {
+				serr := "Invalid signal. Choices: SIGKILL, SIGINT, SIGSTOP, SIGTERM, SIGUSR1, SIGUSR2"
+				jsonEnc := json.NewEncoder(w)
+				if err := jsonEnc.Encode(serr); err != nil {
 					panic(err)
 				}
 				return
@@ -87,8 +91,8 @@ func NewSupervisor(tc <-chan *Task) *Supervisor {
 			}
 		} else {
 			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(fmt.Sprintf("%d Method not allowed\n", http.StatusMethodNotAllowed)))
 		}
-
 	})
 
 	s.HTTP = &http.Server{
@@ -102,6 +106,8 @@ func NewSupervisor(tc <-chan *Task) *Supervisor {
 func (s *Supervisor) ListenAndServe() error {
 	return s.HTTP.ListenAndServe()
 }
+
+// Client side
 
 // QuerySupervisor asks for information and manage a running task
 func QuerySupervisor(query SupervisorQuery, args ...string) error {
@@ -130,13 +136,18 @@ func QuerySupervisor(query SupervisorQuery, args ...string) error {
 			return fmt.Errorf("Cannot signal to task: %v", err)
 		}
 		defer res.Body.Close()
-		decJson := json.NewDecoder(res.Body)
-		var status string
-		err = decJson.Decode(&status)
-		if err != nil {
-			return err
+		if res.StatusCode == http.StatusOK {
+			decJson := json.NewDecoder(res.Body)
+			var status string
+			err = decJson.Decode(&status)
+			if err != nil {
+				return err
+			}
+			fmt.Println("Task:", status)
+		} else {
+			response, _ := ioutil.ReadAll(res.Body)
+			fmt.Fprintf(os.Stderr, "ERROR %s: %s", res.Status, response)
 		}
-		fmt.Println("Task:", status)
 	}
 	return nil
 }
