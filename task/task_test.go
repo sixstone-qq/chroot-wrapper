@@ -197,6 +197,8 @@ func TestKillSignal(test *testing.T) {
 		test.Fatalf("Fail to send signal: %v", err)
 	}
 
+	time.Sleep(10*time.Microsecond)
+
 	if t.Status() != Stopped {
 		test.Errorf("Process must be stopped: %s", t.Status())
 	}
