@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -53,6 +54,7 @@ var SupportedSchemes = map[string]bool{
 
 // Task is a command + URL to an image
 type Task struct {
+	sync.RWMutex
 	// Command to execute. It can be used to retrieve the results
 	Command *exec.Cmd
 	// URL the URL to an image which contains a FS
@@ -94,6 +96,8 @@ func checkedClose(f io.Closer, err *error) {
 
 // Close removes everything we did in the system
 func (t *Task) Close() {
+	t.RLock()
+	defer t.RUnlock()
 	if len(t.dirimage) > 0 {
 		os.RemoveAll(t.dirimage)
 	}
@@ -104,7 +108,10 @@ func (t *Task) Close() {
 
 // ImagePath returns the path where the image file is stored
 func (t *Task) ImagePath() string {
-	return t.image.Name()
+	t.RLock()
+	name := t.image.Name()
+	t.RUnlock()
+	return name
 }
 
 // Retrieve gets the URL from and it stored in the temporary directory
@@ -122,7 +129,7 @@ func (t *Task) Retrieve() (err error) {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("Impossible to get %v: %v", t.URL.String(), resp.Status)
 		}
 
@@ -157,6 +164,8 @@ func (t *Task) Start() error {
 }
 
 func (t *Task) start(chrooted bool) (err error) {
+	t.Lock()
+	defer t.Unlock()
 	if t.image == nil {
 		if err = t.Retrieve(); err != nil {
 			return err
@@ -218,6 +227,8 @@ func (t *Task) StartChroot() error {
 
 // Status returns the current status of the task
 func (t *Task) Status() Status {
+	t.RLock()
+	defer t.RUnlock()
 	status := NotStarted
 	if t.image != nil {
 		status = Retrieved
@@ -267,6 +278,8 @@ func procPidStat(pid int) (rune, error) {
 
 // Signal a task with the given signal
 func (t *Task) Signal(sig os.Signal) error {
+	t.RLock()
+	defer t.RUnlock()
 	if t.Command.Process != nil {
 		return t.Command.Process.Signal(sig)
 	}

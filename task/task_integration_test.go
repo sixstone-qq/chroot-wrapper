@@ -48,7 +48,7 @@ func TestStartTask(t *testing.T) {
 		fmt.Printf("Output: %s\n", out)
 		t.Fatalf("Failed to run: %v", err)
 	}
-	if string(out) != "/\n" {
+	if !strings.Contains(string(out), "/\n") {
 		t.Errorf("Expected out is / != %s", out)
 	}
 }
