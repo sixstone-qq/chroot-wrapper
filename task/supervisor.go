@@ -34,7 +34,7 @@ type SignalPayload struct {
 
 // NewSupervisor creates a task supervisor from a task received from
 // the channel
-func NewSupervisor(tc <-chan *Task) *Supervisor {
+func NewSupervisor(tc <-chan *Task, listeningPort int) *Supervisor {
 	s := &Supervisor{<-tc, nil}
 
 	http.HandleFunc("/"+string(StatusQuery), func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +96,7 @@ func NewSupervisor(tc <-chan *Task) *Supervisor {
 	})
 
 	s.HTTP = &http.Server{
-		Addr: ":6969",
+		Addr: fmt.Sprintf(":%d", listeningPort),
 	}
 
 	return s
@@ -110,8 +110,8 @@ func (s *Supervisor) ListenAndServe() error {
 // Client side
 
 // QuerySupervisor asks for information and manage a running task
-func QuerySupervisor(query SupervisorQuery, args ...string) error {
-	url := fmt.Sprintf("http://127.0.0.1:6969/%s", query)
+func QuerySupervisor(port int, query SupervisorQuery, args ...string) error {
+	url := fmt.Sprintf("http://127.0.0.1:%d/%s", port, query)
 	switch query {
 	case StatusQuery:
 		res, err := http.Get(url)

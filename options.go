@@ -7,6 +7,7 @@ import (
 	"os"
 )
 
+// Options are the arguments given from command line
 type Options struct {
 	// Subcommand to run
 	Command string
@@ -14,7 +15,13 @@ type Options struct {
 	Args []string
 	// flagset
 	flagset *flag.FlagSet
+	// Listening port for the supervisor, having different ports
+	// allowed us to have different tasks running at the same time
+	ListeningPort int `cfg: "port"`
 }
+
+// Default options
+const DefaultListeningPort = 6969
 
 func (o *Options) Usage() {
 	o.flagset.Usage()
@@ -38,6 +45,7 @@ func setupUserOptions(args []string, errorHandling flag.ErrorHandling) *Options 
 	opts := new(Options)
 
 	flagSet := flag.NewFlagSet("chroot-wrapper", errorHandling)
+	flagSet.Int("port", opts.ListeningPort, "Supervisor listening port to query task")
 	flagSet.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage %s [flags] <subcommand> [arguments]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  Available subcommands: run, ps, kill\n\n")
@@ -52,8 +60,14 @@ func setupUserOptions(args []string, errorHandling flag.ErrorHandling) *Options 
 	if len(flagSet.Args()) > 0 {
 		opts.Args = flagSet.Args()[1:]
 	}
-
 	opts.flagset = flagSet
+
+	listeningPort := flagSet.Lookup("port").Value.(flag.Getter).Get().(int)
+	if listeningPort > 0 {
+		opts.ListeningPort = listeningPort
+	} else {
+		opts.ListeningPort = DefaultListeningPort
+	}
 
 	return opts
 }

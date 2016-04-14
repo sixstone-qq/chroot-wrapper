@@ -16,6 +16,7 @@ func main() {
 		}
 		os.Exit(0)
 	}
+	var err error
 	// Standard call
 	opts := UserOptions()
 
@@ -56,7 +57,7 @@ func main() {
 		}(tc, done)
 
 		go func() {
-			supervisor := task.NewSupervisor(tc)
+			supervisor := task.NewSupervisor(tc, opts.ListeningPort)
 			// It is ended by main goroutine when it exits
 			supervisor.ListenAndServe()
 		}()
@@ -64,8 +65,9 @@ func main() {
 		<-done
 		fmt.Println("End!")
 	case "ps":
-		if err := task.QuerySupervisor(task.StatusQuery); err != nil {
-			log.Fatalf("Error querying task status: %v", err)
+		if err = task.QuerySupervisor(opts.ListeningPort, task.StatusQuery); err != nil {
+
+			err = fmt.Errorf("Error querying task status: %v", err)
 		}
 	case "kill":
 		var signal string
@@ -75,11 +77,15 @@ func main() {
 			signal = "SIGKILL"
 		}
 
-		if err := task.QuerySupervisor(task.SignalQuery, signal); err != nil {
-			log.Fatalf("Error sending signal to task: %v", err)
+		if err = task.QuerySupervisor(opts.ListeningPort, task.SignalQuery, signal); err != nil {
+			err = fmt.Errorf("Error sending signal to task: %v", err)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Missing subcommand parameter, available subcommands:\n\n")
 		fmt.Fprintf(os.Stderr, "  run, ps, kill\n")
+	}
+	if err != nil {
+		// Give some hint
+		fmt.Fprintf(os.Stderr, "%s\nIs task running or in a different port?\n", err)
 	}
 }
